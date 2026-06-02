@@ -116,6 +116,31 @@ mark{background:linear-gradient(transparent 55%,#fde04799 55%);color:inherit;pad
 .catcard{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:13px;animation:pop .4s both;transition:.3s}
 .catcard:hover{transform:translateY(-3px);border-color:var(--accent)}
 .catcard .h{font-weight:700;font-size:13px;margin-bottom:4px}.catcard .s{font-size:11px;color:var(--mut)}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1100px){.row{grid-template-columns:1fr}}
+@media(max-width:900px){
+ .side{width:62px}.side .t,.side .navlbl,.side .brand .wm,.side .foot .usr div:last-child,.side .foot>:not(.usr),.nav .cnt{display:none}
+ .brand{justify-content:center;padding-left:0;padding-right:0}.nav{justify-content:center;padding:11px 0}
+ .main{margin-left:62px;width:calc(100% - 62px);padding:14px}
+ body.collapsed .side:hover{box-shadow:12px 0 44px rgba(0,0,0,.6)}
+}
+@media(max-width:760px){
+ .top{flex-direction:column}.top h1{font-size:22px}.top h1::before{height:24px}
+ .rags{width:100%}.rag{flex:1;min-width:96px;padding:8px 11px}.rag b{font-size:15px}
+ .kpis{grid-template-columns:repeat(2,1fr)}
+ .filters{gap:7px}.filters select,.filters input{flex:1 1 100%;min-width:0}
+ .sync .r{flex-direction:column;align-items:stretch}.sync input[type=text]{min-width:0}
+ .chartbox{height:230px}.card{padding:13px}
+ .chip{padding:6px 11px;font-size:11.5px}
+}
+@media(max-width:480px){
+ .main{margin-left:0;width:100%;padding:11px}
+ .side{left:-62px}.side:hover,body.collapsed .side:hover{left:0}
+ .kpis{grid-template-columns:1fr 1fr;gap:9px}.kpi .v{font-size:23px}
+ .top h1{font-size:19px}.gear{width:36px;height:36px}
+ th,td{padding:7px 7px;font-size:11px}
+}
 </style></head><body>
 <aside class="side">
  <div class="brand"><div class="logo"><svg viewBox="0 0 40 40"><path d="M30 11.5 A13 13 0 1 0 30 28.5" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><circle cx="24.5" cy="20" r="3.5" fill="#e8541e"/></svg></div><div class="wm"><b>CENTRAL</b><span>Construction</span></div><button class="toggle" id="toggle" title="Ẩn/hiện thanh bên">«</button></div>
