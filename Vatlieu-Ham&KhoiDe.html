@@ -2,6 +2,7 @@
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Central Dashboard · Trình duyệt vật liệu The Estuary</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#0a0f1c;--bg2:#0f1729;--side:#0c1322;--card:#141d33;--card2:#1b2740;--txt:#e6edf7;--mut:#8b9bb4;
@@ -136,10 +137,14 @@ mark{background:linear-gradient(transparent 55%,#fde04799 55%);color:inherit;pad
 }
 @media(max-width:480px){
  .main{margin-left:0;width:100%;padding:11px}
- .side{left:-62px}.side:hover,body.collapsed .side:hover{left:0}
+ .side{left:-62px;z-index:50;width:200px}.side.open{left:0}.side.open .nav-btn span{width:auto;overflow:visible;white-space:normal}
+ .side:hover,body.collapsed .side:hover{left:0}
  .kpis{grid-template-columns:1fr 1fr;gap:9px}.kpi .v{font-size:23px}
- .top h1{font-size:19px}.gear{width:36px;height:36px}
+ .top h1{font-size:19px}.gear{width:36px;height:36px}#menuToggle{display:flex!important;align-items:center;justify-content:center;font-size:18px;margin-left:6px}
+ .top{flex-wrap:wrap;gap:6px}
  th,td{padding:7px 7px;font-size:11px}
+ .chartbox{height:210px}
+ .row{grid-template-columns:1fr}
 }
 </style></head><body>
 <aside class="side">
@@ -158,7 +163,7 @@ mark{background:linear-gradient(transparent 55%,#fde04799 55%);color:inherit;pad
  <div class="top">
   <div><h1>Trình duyệt vật liệu — Dự án The Estuary</h1>
    <div class="sub">Khu chung cư cao tầng · Phạm vi Hầm &amp; Khối đế · Tổng thầu Central · cập nhật 02/06/2026</div></div>
-  <div style="display:flex;gap:10px;align-items:center"><div class="rags" id="rags"></div><button class="gear" id="gear" title="Cài đặt & Đồng bộ dữ liệu">⚙️</button></div>
+  <div style="display:flex;gap:10px;align-items:center"><div class="rags" id="rags"></div><button class="gear" id="gear" title="Cài đặt & Đồng bộ dữ liệu">⚙️</button><button class="gear" id="menuToggle" title="Mở menu" style="display:none">☰</button></div>
  </div>
  <div class="sync">
    <h3>🔄 Đồng bộ Google Sheet (real-time)</h3>
@@ -262,8 +267,18 @@ function grad(ctx,area,c1,c2){if(!area)return c1;const g=ctx.createLinearGradien
 function hgrad(ctx,area,c1,c2){if(!area)return c1;const g=ctx.createLinearGradient(area.left,0,area.right,0);g.addColorStop(0,c2);g.addColorStop(1,c1);return g;}
 function shade(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
 // doughnut center-text plugin
-const centerText={id:'centerText',afterDraw(ch,a,o){if(!o||!o.text)return;const{ctx,chartArea:{left,right,top,bottom}}=ch;const x=(left+right)/2,y=(top+bottom)/2;ctx.save();ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='800 26px Segoe UI';ctx.fillText(o.text,x,y-3);ctx.fillStyle='#8b9bb4';ctx.font='600 11px Segoe UI';ctx.fillText(o.sub||'',x,y+16);ctx.restore();}};
+const centerText={id:'centerText',afterDraw(ch,a,o){if(!o||!o.text)return;const{ctx,chartArea:{left,right,top,bottom}}=ch;const x=(left+right)/2,y=(top+bottom)/2;ctx.save();ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='800 26px Segoe UI';ctx.fillText(o.text,x,y-7);ctx.fillStyle='#8b9bb4';ctx.font='600 11px Segoe UI';ctx.fillText(o.sub||'',x,y+15);ctx.restore();}};
 Chart.register(centerText);
+// value labels: only stacked totals (drawn outside bar via layout.padding.right)
+const valLabels={id:'valLabels',afterDatasetsDraw(ch,a,o){
+ if(!o||!o.total)return;const{ctx}=ch;ctx.save();ctx.font='700 11px Segoe UI';
+ const horiz=ch.options.indexAxis==='y';
+ ch.data.labels.forEach((lb,i)=>{let sum=0;ch.data.datasets.forEach(ds=>sum+=(+ds.data[i]||0));if(!sum)return;
+  const el=ch.getDatasetMeta(ch.data.datasets.length-1).data[i];
+  ctx.fillStyle='#e6edf7';ctx.textAlign=horiz?'left':'center';ctx.textBaseline=horiz?'middle':'bottom';
+  if(horiz)ctx.fillText(sum,el.x+6,el.y);else ctx.fillText(sum,el.x,el.y-4);});
+ ctx.restore();}};
+Chart.register(valLabels);
 function animNum(el,to){const dur=750,t0=performance.now(),suf=el.dataset.suf||'';
  (function s(t){const p=Math.min(1,(t-t0)/dur);el.textContent=Math.round(to*(1-Math.pow(1-p,3)))+suf;if(p<1)requestAnimationFrame(s);})(performance.now());}
 function render(){
@@ -288,19 +303,21 @@ function render(){
  const noGrid={grid:{display:false},border:{display:false}};
  const xGrid={grid:{color:'rgba(148,163,184,.08)'},border:{display:false},ticks:{precision:0}};
  const scn={};d.forEach(r=>scn[r.status]=(scn[r.status]||0)+1);const sk=Object.keys(scn);
- mkChart('cStatus',{type:'doughnut',data:{labels:sk,datasets:[{data:sk.map(k=>scn[k]),backgroundColor:sk.map(k=>COL[STC[k]||'info']),borderColor:'#0f172a',borderWidth:3,hoverOffset:14,hoverBorderColor:'#fff'}]},options:{cutout:'68%',radius:'92%',plugins:{legend:{position:'right',labels:{usePointStyle:true,pointStyle:'circle',padding:13,boxWidth:8}},centerText:{text:String(tot),sub:'vật liệu'}},maintainAspectRatio:false}});
+ mkChart('cStatus',{type:'doughnut',data:{labels:sk.map(l=>l+' ('+Math.round(scn[l]/tot*100)+'%)'),datasets:[{data:sk.map(k=>scn[k]),backgroundColor:sk.map(k=>COL[STC[k]||'info']),borderColor:'#0f172a',borderWidth:3,hoverOffset:14,hoverBorderColor:'#fff'}]},plugins:[ChartDataLabels],options:{cutout:'68%',radius:'92%',plugins:{datalabels:{color:'#fff',font:{size:11,weight:'700',family:'Segoe UI'},anchor:'center',align:'center',formatter:(v,c)=>tot>0?Math.round(v/tot*100)+'%':''},legend:{position:'right',labels:{usePointStyle:true,pointStyle:'circle',padding:13,boxWidth:8,font:{size:11}}},centerText:{text:String(tot),sub:'vật liệu'}},maintainAspectRatio:false}});
  const secAll=[...new Set(DATA.map(r=>r.sec))];
- mkChart('cSec',{type:'bar',data:{labels:secAll.map(s=>SEC_SHORT[s]||s),datasets:[{data:secAll.map(s=>d.filter(r=>r.sec===s).length),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#38bdf8','#0369a1'),borderRadius:8,barThickness:'flex',maxBarThickness:34}]},options:{indexAxis:'y',plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:xGrid,y:noGrid}}});
+ mkChart('cSec',{type:'bar',data:{labels:secAll.map(s=>SEC_SHORT[s]||s),datasets:[{data:secAll.map(s=>d.filter(r=>r.sec===s).length),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#38bdf8','#0369a1'),borderRadius:8,barThickness:'flex',maxBarThickness:34}]},options:{indexAxis:'y',layout:{padding:{right:46}},plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:{...xGrid,grace:'8%'},y:noGrid}}});
  const stk=[...new Set(DATA.map(r=>r.status))];
- mkChart('cSecStatus',{type:'bar',data:{labels:secAll.map(s=>SEC_SHORT[s]||s),datasets:stk.map(st=>({label:st,backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,COL[STC[st]||'info'],shade(COL[STC[st]||'info'],.55)),data:secAll.map(s=>d.filter(r=>r.sec===s&&r.status===st).length),borderRadius:5,borderSkipped:false,maxBarThickness:60}))},options:{plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:11,boxWidth:8}}},maintainAspectRatio:false,scales:{x:{stacked:true,...noGrid},y:{stacked:true,...xGrid}}}});
+ const secStDatasets=stk.map((st,i)=>{const cnt=secAll.map(s=>d.filter(r=>r.sec===s&&r.status===st).length).reduce((a,b)=>a+b,0);const cv=Object.values(COL)[i%5];return{label:st+' ('+cnt+')',backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,cv,shade(cv,.55)),data:secAll.map(s=>d.filter(r=>r.sec===s&&r.status===st).length),borderRadius:5,borderSkipped:false,maxBarThickness:60};});
+ const secStOpts={layout:{padding:{top:22}},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:11,boxWidth:8,font:{size:10}}},valLabels:{total:true}},maintainAspectRatio:false,scales:{x:{stacked:true,grid:noGrid.grid||{}},y:{stacked:true,grace:'12%',grid:xGrid.grid||{}}}};
+ mkChart('cSecStatus',{type:'bar',data:{labels:secAll.map(s=>SEC_SHORT[s]||s),datasets:secStDatasets},options:secStOpts});
  const su={};d.forEach(r=>{if(r.supplier)su[r.supplier]=(su[r.supplier]||0)+1;});
  const top=Object.entries(su).sort((a,b)=>b[1]-a[1]).slice(0,10);
- mkChart('cSup',{type:'bar',data:{labels:top.map(t=>t[0]),datasets:[{data:top.map(t=>t[1]),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#c084fc','#7c3aed'),borderRadius:8,maxBarThickness:26}]},options:{indexAxis:'y',plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:xGrid,y:noGrid}}});
+ mkChart('cSup',{type:'bar',data:{labels:top.map(t=>t[0]),datasets:[{data:top.map(t=>t[1]),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#c084fc','#7c3aed'),borderRadius:8,maxBarThickness:26}]},options:{indexAxis:'y',layout:{padding:{right:42}},plugins:{legend:{display:false},valLabels:{}},maintainAspectRatio:false,scales:{x:{...xGrid,grace:'8%'},y:noGrid}}});
  const allSu=Object.entries(su).sort((a,b)=>b[1]-a[1]);
- mkChart('cSupAll',{type:'bar',data:{labels:allSu.map(t=>t[0]),datasets:[{data:allSu.map(t=>t[1]),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#60a5fa','#1d4ed8'),borderRadius:7,maxBarThickness:22}]},options:{indexAxis:'y',plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:xGrid,y:noGrid}}});
+ mkChart('cSupAll',{type:'bar',data:{labels:allSu.map(t=>t[0]+' ('+t[1]+')'),datasets:[{data:allSu.map(t=>t[1]),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#60a5fa','#1d4ed8'),borderRadius:7,maxBarThickness:22}]},options:{indexAxis:'y',layout:{padding:{right:44}},plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:{...xGrid,grace:'8%'},y:noGrid}}});
  const mf={};d.forEach(r=>{if(r.mfr)mf[r.mfr]=(mf[r.mfr]||0)+1;});
  const allMf=Object.entries(mf).sort((a,b)=>b[1]-a[1]);
- mkChart('cMfrAll',{type:'bar',data:{labels:allMf.map(t=>t[0]),datasets:[{data:allMf.map(t=>t[1]),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#4ade80','#15803d'),borderRadius:7,maxBarThickness:22}]},options:{indexAxis:'y',plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:xGrid,y:noGrid}}});
+ mkChart('cMfrAll',{type:'bar',data:{labels:allMf.map(t=>t[0]+' ('+t[1]+')'),datasets:[{data:allMf.map(t=>t[1]),backgroundColor:c=>hgrad(c.chart.ctx,c.chart.chartArea,'#4ade80','#15803d'),borderRadius:7,maxBarThickness:22}]},options:{indexAxis:'y',layout:{padding:{right:44}},plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:{...xGrid,grace:'8%'},y:noGrid}}});
  const cats={};d.forEach(r=>{const c=r.cat||'(khác)';(cats[c]=cats[c]||[]).push(r);});
  document.getElementById('catGrid').innerHTML=Object.entries(cats).sort((a,b)=>b[1].length-a[1].length).map(([c,arr],i)=>{
    const o=arr.filter(r=>r.status==='Đã duyệt').length;const p=Math.round(o/arr.length*100);
@@ -390,6 +407,7 @@ async function syncSheet(){
  }catch(e){}}
  setSt('Không tải được. Sheet cần chia sẻ "Anyone with link" hoặc Publish to web; hoặc tải .xlsx và kéo vào ô bên dưới.','#f87171');return false;}
 document.getElementById('gear').onclick=function(){const p=document.querySelector('.sync');p.classList.toggle('open');this.classList.toggle('on',p.classList.contains('open'));};
+document.getElementById('menuToggle').onclick=function(){document.querySelector('.side').classList.toggle('open');};
 document.getElementById('btnSync').onclick=syncSheet;
 document.getElementById('btnTest').onclick=()=>window.open(exportUrlOf(document.getElementById('gsUrl').value.trim()),'_blank');
 let autoTimer=null;
